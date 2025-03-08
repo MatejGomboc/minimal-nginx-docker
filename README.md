@@ -96,6 +96,37 @@ services:
       - "8080"
 ```
 
+## File Structure
+
+The minimal-nginx image contains approximately 30 files and 15 directories, totaling only 7-15MB. Here's the structure:
+
+```
+/
+├── config              # Configuration directory (mountable volume)
+│   └── default.conf    # Default Nginx configuration
+├── etc
+│   └── passwd          # Minimal passwd file for 'nobody' user
+├── lib                 # Only necessary shared libraries
+│   ├── ld-musl-x86_64.so.1
+│   ├── libcrypto.so.3
+│   ├── libpcre.so.1
+│   ├── libssl.so.3
+│   └── libz.so.1
+├── logs                # Logs directory (mountable volume)
+├── usr/local/nginx     # Nginx installation
+│   ├── conf            # Nginx configuration files
+│   ├── html            # Default web content (mountable)
+│   └── sbin            # Nginx binary and startup script
+└── var/run             # Runtime files
+```
+
+To view the exact file structure of your built image, use the included scripts:
+
+- **Linux/macOS**: `chmod +x display-image-files.sh && ./display-image-files.sh`
+- **Windows**: `display-image-files.bat`
+
+These scripts will show a complete tree view of all files in the image. You can also see an example in the `example-file-structure.txt` file.
+
 ## Log Management
 
 All Nginx logs are configured to write to the `/logs` directory, which is defined as a Docker volume. This provides several advantages:
