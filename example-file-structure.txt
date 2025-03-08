@@ -16,8 +16,7 @@
 ├── usr
 │   └── local
 │       └── sbin
-│           ├── nginx
-│           └── start-nginx.sh
+│           └── nginx
 └── var
     ├── log
     │   └── nginx
@@ -28,7 +27,7 @@
     └── www
         └── index.html
 
-# Total file count: ~30 files
+# Total file count: ~25 files
 # Total directory count: ~15 directories
 # Approximate total size: 7-15MB
 
@@ -45,3 +44,5 @@
 #   - /etc/nginx - For custom configuration
 #   - /var/log/nginx - For persistent logs
 #   - /var/www - For web content
+# - Nginx is invoked directly with: 
+#   nginx -g "daemon off;" -c /etc/nginx/nginx.conf
