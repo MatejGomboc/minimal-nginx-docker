@@ -41,8 +41,14 @@ docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/etc/nginx && \
     mkdir -p /nginx-minimal/var/www && \
     mkdir -p /nginx-minimal/usr/local/sbin && \
     cp -r /etc/nginx/* /nginx-minimal/etc/nginx/ && \
-    cp /usr/local/sbin/nginx /nginx-minimal/usr/local/sbin/ && \
-    echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd"
+    cp /usr/local/sbin/nginx /nginx-minimal/usr/local/sbin/"
+
+# Create proper passwd and group files with nobody user and group
+docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/etc && \
+    echo 'root:x:0:0:root:/root:/bin/sh' > /nginx-minimal/etc/passwd && \
+    echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' >> /nginx-minimal/etc/passwd && \
+    echo 'root:x:0:' > /nginx-minimal/etc/group && \
+    echo 'nobody:x:65534:' >> /nginx-minimal/etc/group"
 
 # Step 4: Find and copy all required shared libraries
 docker exec nginx-builder sh -c "ldd /usr/local/sbin/nginx | grep '=> /' | awk '{print \$3}' | \
@@ -60,6 +66,7 @@ fi"
 
 # Step 5: Create a basic nginx configuration
 docker exec nginx-builder sh -c "cat > /nginx-minimal/etc/nginx/nginx.conf << 'EOF'
+user nobody;
 worker_processes 1;
 events { worker_connections 1024; }
 http {
