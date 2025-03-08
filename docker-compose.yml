@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  nginx-proxy:
+    image: minimal-nginx
+    build:
+      context: .
+      dockerfile: Dockerfile.alternative
+    ports:
+      - "80:80"
+    volumes:
+      - ./sample-nginx.conf:/config/nginx.conf
+      - ./frontend:/usr/local/nginx/html
+    networks:
+      - app-network
+    depends_on:
+      - backend-api
+    restart: unless-stopped
+
+  backend-api:
+    # This is a placeholder for your actual backend API service
+    image: node:16-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "echo 'Starting mock API server...' &&
+             echo '#!/bin/sh
+             echo \"HTTP/1.1 200 OK\"
+             echo \"Content-Type: application/json\"
+             echo \"Access-Control-Allow-Origin: *\"
+             echo \"\"
+             echo \"{\\\"message\\\":\\\"Hello from backend API\\\",\\\"status\\\":\\\"success\\\"}\"' > server.sh &&
+             chmod +x server.sh &&
+             while true; do { echo -e 'HTTP/1.1 200 OK\r\n'; cat server.sh | sh; } | nc -l -p 8080; done"
+    expose:
+      - "8080"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
