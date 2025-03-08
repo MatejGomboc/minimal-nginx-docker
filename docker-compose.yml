@@ -11,6 +11,7 @@ services:
     volumes:
       - ./sample-nginx.conf:/config/nginx.conf
       - ./frontend:/usr/local/nginx/html
+      - ./logs:/logs
     networks:
       - app-network
     depends_on:
@@ -42,3 +43,8 @@ services:
 networks:
   app-network:
     driver: bridge
+
+# Make sure logs directory exists
+volumes:
+  logs:
+    driver: local
