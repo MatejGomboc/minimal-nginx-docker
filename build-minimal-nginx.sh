@@ -13,7 +13,7 @@ docker exec nginx-builder sh -c "cd /tmp && wget https://nginx.org/download/ngin
 docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure \
     --prefix=/var/www \
     --sbin-path=/usr/local/sbin/nginx \
-    --conf-path=/etc/nginx/default.conf \
+    --conf-path=/etc/nginx/nginx.conf \
     --pid-path=/var/run/nginx.pid \
     --error-log-path=/var/log/nginx/error.log \
     --http-log-path=/var/log/nginx/access.log \
@@ -88,29 +88,17 @@ docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/var/www && \
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
     /nginx-minimal/var/www/index.html"
 
-# Create a startup wrapper script
-docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/sbin/start-nginx.sh << 'EOF'
-#!/bin/sh
-
 # Ensure log directory exists and has proper permissions
-mkdir -p /var/log/nginx
-chmod 755 /var/log/nginx
-touch /var/log/nginx/access.log /var/log/nginx/error.log
-chmod 644 /var/log/nginx/access.log /var/log/nginx/error.log
-
-# Start Nginx in foreground
-exec /usr/local/sbin/nginx -g "daemon off;" -c /etc/nginx/nginx.conf
-EOF"
-
-# Make the startup script executable
-docker exec nginx-builder sh -c "chmod +x /nginx-minimal/usr/local/sbin/start-nginx.sh"
+docker exec nginx-builder sh -c "chmod 755 /nginx-minimal/var/log/nginx && \
+    touch /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log && \
+    chmod 644 /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log"
 
 # Step 6: Import the filesystem directly as a Docker image
 docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | \
     docker import - \
     --change 'EXPOSE 80' \
     --change 'VOLUME ["/etc/nginx", "/var/log/nginx", "/var/www"]' \
-    --change 'CMD ["/usr/local/sbin/start-nginx.sh"]' \
+    --change 'CMD ["/usr/local/sbin/nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]' \
     minimal-nginx
 
 # Step 7: Clean up
