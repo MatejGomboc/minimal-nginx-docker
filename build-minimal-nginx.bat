@@ -44,7 +44,7 @@ if %ERRORLEVEL% neq 0 (
     goto cleanup
 )
 
-REM Step 4: Find and copy all required shared libraries
+REM Step 4: Find and copy all required shared libraries - Fixed for Windows
 echo Step 4: Copying required shared libraries...
 docker exec nginx-builder sh -c "ldd /usr/local/sbin/nginx | grep '=> /' | awk '{print \$3}' | xargs -I '{}' dirname '{}' | sort -u | xargs -I '{}' mkdir -p '/nginx-minimal{}'"
 docker exec nginx-builder sh -c "ldd /usr/local/sbin/nginx | grep '=> /' | awk '{print \$3}' | xargs -I '{}' cp -v '{}' '/nginx-minimal{}'"
@@ -58,29 +58,29 @@ docker exec nginx-builder sh -c "if [ -f /lib/ld-musl-*.so.1 ]; then mkdir -p /n
 
 REM Step 5: Create a basic nginx configuration
 echo Step 5: Creating default configuration...
-docker exec nginx-builder sh -c "cat > /nginx-minimal/etc/nginx/nginx.conf << 'EOF'
-worker_processes 1;
-events { worker_connections 1024; }
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-    sendfile        on;
-    keepalive_timeout  65;
-    
-    # Log configuration
-    access_log  /var/log/nginx/access.log;
-    error_log   /var/log/nginx/error.log;
-    
-    server {
-        listen       80;
-        server_name  localhost;
-        location / {
-            root   /var/www;
-            index  index.html index.htm;
-        }
-    }
-}
-EOF"
+
+REM Use echo inside the container to create the config file - fixed for Windows
+docker exec nginx-builder sh -c "echo 'worker_processes 1;' > /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo 'events { worker_connections 1024; }' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo 'http {' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    include       mime.types;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    default_type  application/octet-stream;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    sendfile        on;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    keepalive_timeout  65;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    # Log configuration' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    access_log  /var/log/nginx/access.log;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    error_log   /var/log/nginx/error.log;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    server {' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '        listen       80;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '        server_name  localhost;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '        location / {' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '            root   /var/www;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '            index  index.html index.htm;' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '        }' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '    }' >> /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo '}' >> /nginx-minimal/etc/nginx/nginx.conf"
 
 REM Create a simple index.html file
 docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/var/www && echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > /nginx-minimal/var/www/index.html"
