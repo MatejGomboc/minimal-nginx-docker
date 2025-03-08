@@ -99,15 +99,14 @@ services:
 
 ## File Structure
 
-The minimal-nginx image contains approximately 30 files and 15 directories, totaling only 7-15MB. Here's the structure:
+The minimal-nginx image contains approximately 25 files and 15 directories, totaling only 7-15MB. Here's the structure:
 
 ```
 /
 ├── etc
 │   ├── nginx            # Configuration directory (mountable volume)
-│   │   ├── default.conf
-│   │   ├── mime.types
-│   │   └── nginx.conf   # Main Nginx configuration
+│   │   ├── nginx.conf   # Main Nginx configuration
+│   │   └── mime.types   # MIME type definitions
 │   └── passwd           # Minimal passwd file for 'nobody' user
 ├── lib                  # Only necessary shared libraries
 │   ├── ld-musl-x86_64.so.1
@@ -115,12 +114,10 @@ The minimal-nginx image contains approximately 30 files and 15 directories, tota
 │   ├── libpcre.so.1
 │   ├── libssl.so.3
 │   └── libz.so.1
-├── usr/local/sbin       # Executables
-│   ├── nginx            # Nginx binary
-│   └── start-nginx.sh   # Startup script
+├── usr/local/sbin
+│   └── nginx            # Nginx binary
 └── var
     ├── log/nginx        # Logs directory (mountable volume)
-    ├── run              # Runtime files
     └── www              # Web content (mountable volume)
 ```
 
