@@ -6,7 +6,8 @@
 │   │   ├── mime.types.default
 │   │   ├── nginx.conf
 │   │   └── ... (other Nginx config files)
-│   └── passwd
+│   ├── passwd
+│   └── group
 ├── lib
 │   ├── ld-musl-x86_64.so.1
 │   ├── libcrypto.so.3
@@ -27,9 +28,9 @@
     └── www
         └── index.html
 
-# Total file count: ~25 files
+# Total file count: ~27 files
 # Total directory count: ~15 directories
-# Approximate total size: 7-15MB
+# Approximate total size: 4.8MB
 
 # Notes:
 # - The image is extremely minimal with only essential files
@@ -44,5 +45,7 @@
 #   - /etc/nginx - For custom configuration
 #   - /var/log/nginx - For persistent logs
 #   - /var/www - For web content
+# - Nginx is configured to run as the 'nobody' user
+# - Proper passwd and group files created to support the 'nobody' user
 # - Nginx is invoked directly with: 
 #   nginx -g "daemon off;" -c /etc/nginx/nginx.conf
