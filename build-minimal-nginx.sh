@@ -15,8 +15,8 @@ docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure \
     --sbin-path=/usr/local/nginx/sbin/nginx \
     --conf-path=/usr/local/nginx/conf/nginx.conf \
     --pid-path=/var/run/nginx.pid \
-    --error-log-path=/var/log/nginx/error.log \
-    --http-log-path=/var/log/nginx/access.log \
+    --error-log-path=/logs/error.log \
+    --http-log-path=/logs/access.log \
     --with-pcre \
     --with-http_ssl_module \
     --with-http_v2_module \
@@ -36,7 +36,7 @@ docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure \
 
 # Step 3: Create a minimal filesystem structure
 docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx && \
-    mkdir -p /nginx-minimal/var/log/nginx && \
+    mkdir -p /nginx-minimal/logs && \
     mkdir -p /nginx-minimal/var/run && \
     mkdir -p /nginx-minimal/etc && \
     mkdir -p /nginx-minimal/config && \
@@ -66,6 +66,11 @@ http {
     default_type  application/octet-stream;
     sendfile        on;
     keepalive_timeout  65;
+
+    # Log configuration
+    access_log  /logs/access.log;
+    error_log   /logs/error.log;
+
     server {
         listen       80;
         server_name  localhost;
@@ -82,9 +87,16 @@ docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx/html &&
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
     /nginx-minimal/usr/local/nginx/html/index.html"
 
-# Create a startup wrapper script that checks for mounted config
+# Create a startup wrapper script that checks for mounted config and logs
 docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
 #!/bin/sh
+
+# Ensure log directory exists and has proper permissions
+mkdir -p /logs
+chmod 755 /logs
+touch /logs/access.log /logs/error.log
+chmod 644 /logs/access.log /logs/error.log
+
 # Check if user mounted a custom config
 if [ -f /config/nginx.conf ]; then
     # Use mounted config
@@ -107,7 +119,7 @@ docker exec nginx-builder sh -c "chmod +x /nginx-minimal/usr/local/nginx/sbin/st
 docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | \
     docker import - \
     --change 'EXPOSE 80' \
-    --change 'VOLUME ["/config"]' \
+    --change 'VOLUME ["/config", "/logs"]' \
     --change 'CMD ["/usr/local/nginx/sbin/start-nginx.sh"]' \
     minimal-nginx
 
@@ -124,6 +136,6 @@ echo ""
 echo "To run with default configuration:"
 echo "docker run -d -p 8080:80 --name nginx-server minimal-nginx"
 echo ""
-echo "To run with custom configuration:"
-echo "docker run -d -p 8080:80 -v \$(pwd)/my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx"
+echo "To run with custom configuration and persistent logs:"
+echo "docker run -d -p 8080:80 -v \$(pwd)/my-nginx.conf:/config/nginx.conf -v \$(pwd)/logs:/logs --name nginx-server minimal-nginx"
 echo ""
