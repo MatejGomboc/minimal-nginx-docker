@@ -1,7 +1,11 @@
 /
-├── config
-│   └── default.conf
 ├── etc
+│   ├── nginx
+│   │   ├── default.conf
+│   │   ├── mime.types
+│   │   ├── mime.types.default
+│   │   ├── nginx.conf
+│   │   └── ... (other Nginx config files)
 │   └── passwd
 ├── lib
 │   ├── ld-musl-x86_64.so.1
@@ -9,33 +13,20 @@
 │   ├── libpcre.so.1
 │   ├── libssl.so.3
 │   └── libz.so.1
-├── logs
 ├── usr
 │   └── local
-│       └── nginx
-│           ├── conf
-│           │   ├── fastcgi.conf
-│           │   ├── fastcgi.conf.default
-│           │   ├── fastcgi_params
-│           │   ├── fastcgi_params.default
-│           │   ├── koi-utf
-│           │   ├── koi-win
-│           │   ├── mime.types
-│           │   ├── mime.types.default
-│           │   ├── nginx.conf
-│           │   ├── nginx.conf.default
-│           │   ├── scgi_params
-│           │   ├── scgi_params.default
-│           │   ├── uwsgi_params
-│           │   ├── uwsgi_params.default
-│           │   └── win-utf
-│           ├── html
-│           │   └── index.html
-│           └── sbin
-│               ├── nginx
-│               └── start-nginx.sh
+│       └── sbin
+│           ├── nginx
+│           └── start-nginx.sh
 └── var
-    └── run
+    ├── log
+    │   └── nginx
+    │       ├── access.log
+    │       └── error.log
+    ├── run
+    │   └── nginx.pid
+    └── www
+        └── index.html
 
 # Total file count: ~30 files
 # Total directory count: ~15 directories
@@ -44,7 +35,13 @@
 # Notes:
 # - The image is extremely minimal with only essential files
 # - No shell, package manager, or system utilities are included
-# - All nginx dependencies are contained in /lib
-# - Configuration is stored in /config for easy volume mounting
-# - Logs directory is empty by default but ready for mounting
-# - The start-nginx.sh script copies config and prepares logging
+# - All Nginx dependencies are contained in /lib
+# - Configuration follows standard Linux path conventions:
+#   - Nginx configs in /etc/nginx/
+#   - Executable in /usr/local/sbin/
+#   - Web content in /var/www/
+#   - Logs in /var/log/nginx/
+# - Three mountable volumes:
+#   - /etc/nginx - For custom configuration
+#   - /var/log/nginx - For persistent logs
+#   - /var/www - For web content
