@@ -45,6 +45,7 @@ RUN mkdir -p /nginx-minimal/usr/local/nginx && \
     mkdir -p /nginx-minimal/var/log/nginx && \
     mkdir -p /nginx-minimal/var/run && \
     mkdir -p /nginx-minimal/etc && \
+    mkdir -p /nginx-minimal/config && \
     cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && \
     echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd
 
@@ -54,8 +55,8 @@ RUN mkdir -p /nginx-minimal/lib && \
     xargs -I '{}' cp -v '{}' /nginx-minimal/lib/ && \
     cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true
 
-# Create a basic nginx configuration
-RUN cat > /nginx-minimal/usr/local/nginx/conf/nginx.conf << 'EOF'
+# Create a default nginx configuration
+RUN cat > /nginx-minimal/config/default.conf << 'EOF'
 worker_processes 1;
 events { worker_connections 1024; }
 http {
@@ -79,14 +80,38 @@ RUN mkdir -p /nginx-minimal/usr/local/nginx/html && \
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
     /nginx-minimal/usr/local/nginx/html/index.html
 
+# Create a startup wrapper script
+RUN cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
+#!/bin/sh
+# Check if user mounted a custom config
+if [ -f /config/nginx.conf ]; then
+    # Use mounted config
+    cp -f /config/nginx.conf /usr/local/nginx/conf/nginx.conf
+    echo "Using custom Nginx configuration from mounted volume"
+else
+    # Use default config
+    cp -f /config/default.conf /usr/local/nginx/conf/nginx.conf
+    echo "Using default Nginx configuration"
+fi
+
+# Start Nginx in foreground
+exec /usr/local/nginx/sbin/nginx -g "daemon off;"
+EOF
+
+# Make the startup script executable
+RUN chmod +x /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh
+
 # Final image
 FROM scratch
 
 # Copy the entire minimal filesystem
 COPY --from=builder /nginx-minimal /
 
+# Define a volume for configuration
+VOLUME ["/config"]
+
 # Expose port
 EXPOSE 80
 
 # Set command
-CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
+CMD ["/usr/local/nginx/sbin/start-nginx.sh"]
