@@ -30,7 +30,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Configure and build Nginx with minimal modules using standard paths
 echo Building Nginx from source (this may take a few minutes)...
-docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure --prefix=/var/www --sbin-path=/usr/local/sbin/nginx --conf-path=/etc/nginx/default.conf --pid-path=/var/run/nginx.pid --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --with-pcre --with-http_ssl_module --with-http_v2_module --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_geo_module --without-http_map_module --without-http_split_clients_module --without-http_referer_module --without-http_rewrite_module --without-http_proxy_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
+docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure --prefix=/var/www --sbin-path=/usr/local/sbin/nginx --conf-path=/etc/nginx/nginx.conf --pid-path=/var/run/nginx.pid --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --with-pcre --with-http_ssl_module --with-http_v2_module --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_geo_module --without-http_map_module --without-http_split_clients_module --without-http_referer_module --without-http_rewrite_module --without-http_proxy_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to build Nginx
     goto cleanup
@@ -89,31 +89,12 @@ if %ERRORLEVEL% neq 0 (
     goto cleanup
 )
 
-REM Create a startup wrapper script
-echo Creating startup wrapper script...
-docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/sbin/start-nginx.sh << 'EOF'
-#!/bin/sh
-
-# Ensure log directory exists and has proper permissions
-mkdir -p /var/log/nginx
-chmod 755 /var/log/nginx
-touch /var/log/nginx/access.log /var/log/nginx/error.log
-chmod 644 /var/log/nginx/access.log /var/log/nginx/error.log
-
-# Start Nginx in foreground
-exec /usr/local/sbin/nginx -g \"daemon off;\" -c /etc/nginx/nginx.conf
-EOF"
-
-REM Make the startup script executable
-docker exec nginx-builder sh -c "chmod +x /nginx-minimal/usr/local/sbin/start-nginx.sh"
-if %ERRORLEVEL% neq 0 (
-    echo Error: Failed to create startup script
-    goto cleanup
-)
+REM Ensure log directory exists and has proper permissions
+docker exec nginx-builder sh -c "chmod 755 /nginx-minimal/var/log/nginx && touch /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log && chmod 644 /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log"
 
 REM Step 6: Import the filesystem directly as a Docker image
 echo Step 6: Creating Docker image...
-docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | docker import - --change "EXPOSE 80" --change "VOLUME [\"/etc/nginx\", \"/var/log/nginx\", \"/var/www\"]" --change "CMD [\"/usr/local/sbin/start-nginx.sh\"]" minimal-nginx
+docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | docker import - --change "EXPOSE 80" --change "VOLUME [\"/etc/nginx\", \"/var/log/nginx\", \"/var/www\"]" --change "CMD [\"/usr/local/sbin/nginx\", \"-g\", \"daemon off;\", \"-c\", \"/etc/nginx/nginx.conf\"]" minimal-nginx
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to create Docker image
     goto cleanup
