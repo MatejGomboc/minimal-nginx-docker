@@ -44,22 +44,15 @@ if %ERRORLEVEL% neq 0 (
     goto cleanup
 )
 
-REM Step 4: Find and copy all required shared libraries - Simplified for Windows
+REM Step 4: Copy necessary libraries - using simpler approach for Windows
 echo Step 4: Copying required shared libraries...
 
-REM Create a script to handle library detection and copying inside the container (avoiding complex awk commands)
-docker exec nginx-builder sh -c "echo '#!/bin/sh' > /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo 'mkdir -p /nginx-minimal/lib' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo 'cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo 'ldd /usr/local/sbin/nginx | grep \"=> /\" | while read line; do' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '  lib=$(echo $line | cut -d \"=>\" -f2 | cut -d \"(\" -f1 | tr -d \" \")' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '  if [ -f \"$lib\" ]; then' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '    dir=$(dirname \"$lib\")' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '    mkdir -p \"/nginx-minimal$dir\"' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '    cp -v \"$lib\" \"/nginx-minimal$dir/\"' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo '  fi' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "echo 'done' >> /tmp/copy_libs.sh"
-docker exec nginx-builder sh -c "chmod +x /tmp/copy_libs.sh && /tmp/copy_libs.sh"
+REM Create lib directory and copy dynamic loader
+docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/lib"
+docker exec nginx-builder sh -c "cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true"
+
+REM Copy required libraries - direct command approach
+docker exec nginx-builder sh -c "for lib in $(ldd /usr/local/sbin/nginx | grep '=>' | awk '{print $3}'); do if [ -f \"$lib\" ]; then mkdir -p /nginx-minimal$(dirname $lib); cp -v $lib /nginx-minimal$(dirname $lib)/; fi; done"
 
 REM Step 5: Create a basic nginx configuration
 echo Step 5: Creating default configuration...
