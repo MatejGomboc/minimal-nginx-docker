@@ -2,7 +2,7 @@
 
 This project creates an ultra-minimal Docker image for Nginx specifically designed for reverse proxy scenarios where you need to:
 
-1. Serve static frontend assets (HTML, CSS, JS)
+1. Serve static frontend assets (HTML, CSS, JS, images, icons, ...)
 2. Proxy API requests to backend services
 
 At 7-15MB in size, this image is perfect for microservice architectures where Nginx serves as a lightweight gateway/edge service.
@@ -120,13 +120,6 @@ The minimal-nginx image contains approximately 25 files and 15 directories, tota
     ├── log/nginx        # Logs directory (mountable volume)
     └── www              # Web content (mountable volume)
 ```
-
-To view the exact file structure of your built image, use the included scripts:
-
-- **Linux/macOS**: `chmod +x display-image-files.sh && ./display-image-files.sh`
-- **Windows**: `display-image-files.bat`
-
-These scripts will show a complete tree view of all files in the image. You can also see an example in the `example-file-structure.txt` file.
 
 ## Log Management
 
