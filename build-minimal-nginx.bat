@@ -30,7 +30,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Configure and build Nginx with minimal modules
 echo Building Nginx from source (this may take a few minutes)...
-docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure --prefix=/usr/local/nginx --sbin-path=/usr/local/nginx/sbin/nginx --conf-path=/usr/local/nginx/conf/nginx.conf --pid-path=/var/run/nginx.pid --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --with-pcre --with-http_ssl_module --with-http_v2_module --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_geo_module --without-http_map_module --without-http_split_clients_module --without-http_referer_module --without-http_rewrite_module --without-http_proxy_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
+docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure --prefix=/usr/local/nginx --sbin-path=/usr/local/nginx/sbin/nginx --conf-path=/usr/local/nginx/conf/nginx.conf --pid-path=/var/run/nginx.pid --error-log-path=/logs/error.log --http-log-path=/logs/access.log --with-pcre --with-http_ssl_module --with-http_v2_module --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_geo_module --without-http_map_module --without-http_split_clients_module --without-http_referer_module --without-http_rewrite_module --without-http_proxy_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to build Nginx
     goto cleanup
@@ -38,7 +38,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Step 3: Create a minimal filesystem structure
 echo Step 3: Creating minimal filesystem structure...
-docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx && mkdir -p /nginx-minimal/var/log/nginx && mkdir -p /nginx-minimal/var/run && mkdir -p /nginx-minimal/etc && mkdir -p /nginx-minimal/config && cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd"
+docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx && mkdir -p /nginx-minimal/logs && mkdir -p /nginx-minimal/var/run && mkdir -p /nginx-minimal/etc && mkdir -p /nginx-minimal/config && cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to create filesystem structure
     goto cleanup
@@ -66,6 +66,11 @@ http {
     default_type  application/octet-stream;
     sendfile        on;
     keepalive_timeout  65;
+    
+    # Log configuration
+    access_log  /logs/access.log;
+    error_log   /logs/error.log;
+    
     server {
         listen       80;
         server_name  localhost;
@@ -84,10 +89,17 @@ if %ERRORLEVEL% neq 0 (
     goto cleanup
 )
 
-REM Create a startup wrapper script that checks for mounted config
+REM Create a startup wrapper script that checks for mounted config and logs
 echo Creating startup wrapper script...
 docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
 #!/bin/sh
+
+# Ensure log directory exists and has proper permissions
+mkdir -p /logs
+chmod 755 /logs
+touch /logs/access.log /logs/error.log
+chmod 644 /logs/access.log /logs/error.log
+
 # Check if user mounted a custom config
 if [ -f /config/nginx.conf ]; then
     # Use mounted config
@@ -112,7 +124,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Step 6: Import the filesystem directly as a Docker image
 echo Step 6: Creating Docker image...
-docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | docker import - --change "EXPOSE 80" --change "VOLUME [\"/config\"]" --change "CMD [\"/usr/local/nginx/sbin/start-nginx.sh\"]" minimal-nginx
+docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | docker import - --change "EXPOSE 80" --change "VOLUME [\"/config\", \"/logs\"]" --change "CMD [\"/usr/local/nginx/sbin/start-nginx.sh\"]" minimal-nginx
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to create Docker image
     goto cleanup
@@ -134,8 +146,8 @@ echo.
 echo To run with default configuration:
 echo docker run -d -p 8080:80 --name nginx-server minimal-nginx
 echo.
-echo To run with custom configuration:
-echo docker run -d -p 8080:80 -v %cd%\my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx
+echo To run with custom configuration and persistent logs:
+echo docker run -d -p 8080:80 -v %cd%\my-nginx.conf:/config/nginx.conf -v %cd%\logs:/logs --name nginx-server minimal-nginx
 echo.
 
 endlocal
