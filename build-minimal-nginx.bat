@@ -44,22 +44,27 @@ if %ERRORLEVEL% neq 0 (
     goto cleanup
 )
 
-REM Step 4: Find and copy all required shared libraries - Fixed for Windows
+REM Step 4: Find and copy all required shared libraries - Simplified for Windows
 echo Step 4: Copying required shared libraries...
-docker exec nginx-builder sh -c "ldd /usr/local/sbin/nginx | grep '=> /' | awk '{print \$3}' | xargs -I '{}' dirname '{}' | sort -u | xargs -I '{}' mkdir -p '/nginx-minimal{}'"
-docker exec nginx-builder sh -c "ldd /usr/local/sbin/nginx | grep '=> /' | awk '{print \$3}' | xargs -I '{}' cp -v '{}' '/nginx-minimal{}'"
-if %ERRORLEVEL% neq 0 (
-    echo Error: Failed to copy shared libraries
-    goto cleanup
-)
 
-REM Copy dynamic loader if needed
-docker exec nginx-builder sh -c "if [ -f /lib/ld-musl-*.so.1 ]; then mkdir -p /nginx-minimal/lib && cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/; fi"
+REM Create a script to handle library detection and copying inside the container (avoiding complex awk commands)
+docker exec nginx-builder sh -c "echo '#!/bin/sh' > /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo 'mkdir -p /nginx-minimal/lib' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo 'cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo 'ldd /usr/local/sbin/nginx | grep \"=> /\" | while read line; do' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '  lib=$(echo $line | cut -d \"=>\" -f2 | cut -d \"(\" -f1 | tr -d \" \")' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '  if [ -f \"$lib\" ]; then' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '    dir=$(dirname \"$lib\")' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '    mkdir -p \"/nginx-minimal$dir\"' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '    cp -v \"$lib\" \"/nginx-minimal$dir/\"' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo '  fi' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "echo 'done' >> /tmp/copy_libs.sh"
+docker exec nginx-builder sh -c "chmod +x /tmp/copy_libs.sh && /tmp/copy_libs.sh"
 
 REM Step 5: Create a basic nginx configuration
 echo Step 5: Creating default configuration...
 
-REM Use echo inside the container to create the config file - fixed for Windows
+REM Use echo inside the container to create the config file
 docker exec nginx-builder sh -c "echo 'worker_processes 1;' > /nginx-minimal/etc/nginx/nginx.conf"
 docker exec nginx-builder sh -c "echo 'events { worker_connections 1024; }' >> /nginx-minimal/etc/nginx/nginx.conf"
 docker exec nginx-builder sh -c "echo 'http {' >> /nginx-minimal/etc/nginx/nginx.conf"
