@@ -1,13 +1,19 @@
-# Minimal Nginx Docker Image
+# Minimal Nginx Docker Image for Reverse Proxy
 
-This project demonstrates how to create the smallest possible Docker image for Nginx by compiling it from source and extracting only the necessary files and dependencies.
+This project creates an ultra-minimal Docker image for Nginx specifically designed for reverse proxy scenarios where you need to:
 
-## Why build a minimal Nginx image?
+1. Serve static frontend assets (HTML, CSS, JS)
+2. Proxy API requests to backend services
 
-- **Extremely small size**: Resulting image is typically 7-15MB compared to 20-30MB for nginx:alpine and 130MB+ for nginx:latest
-- **Reduced attack surface**: Fewer components means fewer potential vulnerabilities
-- **Faster downloads and deployments**: Smaller images pull and start faster
-- **Learning opportunity**: Understand exactly what components are necessary for Nginx to run
+At 7-15MB in size, this image is perfect for microservice architectures where Nginx serves as a lightweight gateway/edge service.
+
+## Why use this minimal Nginx image?
+
+- **Extremely small footprint**: 7-15MB compared to 20-30MB for nginx:alpine and 130MB+ for nginx:latest
+- **Minimal attack surface**: Contains only what's needed for proxy/static file serving
+- **Fast startup**: Smaller images pull and deploy faster, ideal for scaling and CI/CD pipelines
+- **Resource efficient**: Low memory usage, perfect for containerized environments
+- **External configuration**: Mount your Nginx config without rebuilding the image
 
 ## Requirements
 
@@ -41,43 +47,79 @@ cd minimal-nginx-docker
 build-minimal-nginx.bat
 ```
 
-## How it works
+## Running as a reverse proxy
 
-The build process follows these steps:
-
-1. Creates a temporary Alpine container for building
-2. Installs build dependencies and compiles Nginx from source with minimal modules
-3. Creates a minimal filesystem with only required files
-4. Identifies and copies all necessary shared libraries
-5. Creates a basic Nginx configuration as a default
-6. Creates a startup script that can use external configuration
-7. Imports the minimal filesystem directly as a Docker image
-8. Adds metadata like EXPOSE, VOLUME, and CMD
-
-## Running the minimal Nginx image
-
-### With default configuration
+### Basic setup with default configuration
 
 ```bash
-docker run -d -p 8080:80 --name nginx-server minimal-nginx
+docker run -d -p 80:80 --name nginx-proxy minimal-nginx
 ```
 
-### With custom configuration file
+### Using with a backend API service
 
-Create your own `nginx.conf` file and mount it:
+Using Docker Compose is the recommended approach for connecting to your backend:
+
+```yaml
+# docker-compose.yml example
+version: '3'
+
+services:
+  nginx:
+    image: minimal-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./sample-nginx.conf:/config/nginx.conf
+      - ./frontend:/usr/local/nginx/html
+    depends_on:
+      - backend-api
+
+  backend-api:
+    image: your-backend-api-image
+    expose:
+      - "8080"
+```
+
+### Custom reverse proxy configuration
+
+The repository includes a sample reverse proxy configuration. To use it:
 
 ```bash
 # Linux/macOS
-docker run -d -p 8080:80 -v $(pwd)/my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx
+docker run -d -p 80:80 -v $(pwd)/sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
 
 # Windows (Command Prompt)
-docker run -d -p 8080:80 -v %cd%\my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx
+docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
 
 # Windows (PowerShell)
-docker run -d -p 8080:80 -v ${PWD}\my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx
+docker run -d -p 80:80 -v ${PWD}\sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
 ```
 
-Then visit http://localhost:8080 in your browser to see Nginx in action.
+### Mounting static frontend files
+
+You can also mount your frontend assets:
+
+```bash
+# Linux/macOS
+docker run -d -p 80:80 \
+  -v $(pwd)/sample-nginx.conf:/config/nginx.conf \
+  -v $(pwd)/frontend:/usr/local/nginx/html \
+  --name nginx-proxy minimal-nginx
+
+# Windows (simplified)
+docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf -v %cd%\frontend:/usr/local/nginx/html --name nginx-proxy minimal-nginx
+```
+
+## Sample Nginx configuration explained
+
+The included `sample-nginx.conf` is optimized for the reverse proxy use case:
+
+- Serves static frontend assets with proper caching headers
+- Proxies API requests to a backend service
+- Includes response caching for GET requests
+- Sets security headers
+- Handles SPA routing by redirecting to index.html
+- Optimized for performance with compression, caching, and buffer settings
 
 ## Customizing the build
 
