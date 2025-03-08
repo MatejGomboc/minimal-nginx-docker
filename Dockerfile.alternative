@@ -17,7 +17,7 @@ WORKDIR /tmp/nginx-1.24.0
 RUN ./configure \
     --prefix=/var/www \
     --sbin-path=/usr/local/sbin/nginx \
-    --conf-path=/etc/nginx/default.conf \
+    --conf-path=/etc/nginx/nginx.conf \
     --pid-path=/var/run/nginx.pid \
     --error-log-path=/var/log/nginx/error.log \
     --http-log-path=/var/log/nginx/access.log \
@@ -86,22 +86,10 @@ RUN mkdir -p /nginx-minimal/var/www && \
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
     /nginx-minimal/var/www/index.html
 
-# Create a startup wrapper script with standard paths
-RUN cat > /nginx-minimal/usr/local/sbin/start-nginx.sh << 'EOF'
-#!/bin/sh
-
 # Ensure log directory exists and has proper permissions
-mkdir -p /var/log/nginx
-chmod 755 /var/log/nginx
-touch /var/log/nginx/access.log /var/log/nginx/error.log
-chmod 644 /var/log/nginx/access.log /var/log/nginx/error.log
-
-# Start Nginx in foreground
-exec /usr/local/sbin/nginx -g "daemon off;" -c /etc/nginx/nginx.conf
-EOF
-
-# Make the startup script executable
-RUN chmod +x /nginx-minimal/usr/local/sbin/start-nginx.sh
+RUN chmod 755 /nginx-minimal/var/log/nginx && \
+    touch /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log && \
+    chmod 644 /nginx-minimal/var/log/nginx/access.log /nginx-minimal/var/log/nginx/error.log
 
 # Final image
 FROM scratch
@@ -115,5 +103,5 @@ VOLUME ["/etc/nginx", "/var/log/nginx", "/var/www"]
 # Expose port
 EXPOSE 80
 
-# Set command
-CMD ["/usr/local/sbin/start-nginx.sh"]
+# Set command to run Nginx directly
+CMD ["/usr/local/sbin/nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]
