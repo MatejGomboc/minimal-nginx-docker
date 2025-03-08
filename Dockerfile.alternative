@@ -12,15 +12,15 @@ WORKDIR /tmp
 RUN wget https://nginx.org/download/nginx-1.24.0.tar.gz && \
     tar -zxf nginx-1.24.0.tar.gz
 
-# Configure and build Nginx with minimal modules
+# Configure and build Nginx with minimal modules using standard paths
 WORKDIR /tmp/nginx-1.24.0
 RUN ./configure \
-    --prefix=/usr/local/nginx \
-    --sbin-path=/usr/local/nginx/sbin/nginx \
-    --conf-path=/usr/local/nginx/conf/nginx.conf \
+    --prefix=/var/www \
+    --sbin-path=/usr/local/sbin/nginx \
+    --conf-path=/etc/nginx/default.conf \
     --pid-path=/var/run/nginx.pid \
-    --error-log-path=/logs/error.log \
-    --http-log-path=/logs/access.log \
+    --error-log-path=/var/log/nginx/error.log \
+    --http-log-path=/var/log/nginx/access.log \
     --with-pcre \
     --with-http_ssl_module \
     --with-http_v2_module \
@@ -40,23 +40,24 @@ RUN ./configure \
     make && \
     make install
 
-# Prepare minimal filesystem
-RUN mkdir -p /nginx-minimal/usr/local/nginx && \
-    mkdir -p /nginx-minimal/logs && \
+# Prepare minimal filesystem with standard paths
+RUN mkdir -p /nginx-minimal/etc/nginx && \
+    mkdir -p /nginx-minimal/var/log/nginx && \
     mkdir -p /nginx-minimal/var/run && \
-    mkdir -p /nginx-minimal/etc && \
-    mkdir -p /nginx-minimal/config && \
-    cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && \
+    mkdir -p /nginx-minimal/var/www && \
+    mkdir -p /nginx-minimal/usr/local/sbin && \
+    cp -r /etc/nginx/* /nginx-minimal/etc/nginx/ && \
+    cp /usr/local/sbin/nginx /nginx-minimal/usr/local/sbin/ && \
     echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd
 
 # Find and copy required libraries
 RUN mkdir -p /nginx-minimal/lib && \
-    ldd /usr/local/nginx/sbin/nginx | grep "=> /" | awk '{print $3}' | \
+    ldd /usr/local/sbin/nginx | grep "=> /" | awk '{print $3}' | \
     xargs -I '{}' cp -v '{}' /nginx-minimal/lib/ && \
     cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true
 
-# Create a default nginx configuration
-RUN cat > /nginx-minimal/config/default.conf << 'EOF'
+# Create nginx.conf with standard paths
+RUN cat > /nginx-minimal/etc/nginx/nginx.conf << 'EOF'
 worker_processes 1;
 events { worker_connections 1024; }
 http {
@@ -66,14 +67,14 @@ http {
     keepalive_timeout  65;
 
     # Log configuration
-    access_log  /logs/access.log;
-    error_log   /logs/error.log;
+    access_log  /var/log/nginx/access.log;
+    error_log   /var/log/nginx/error.log;
 
     server {
         listen       80;
         server_name  localhost;
         location / {
-            root   html;
+            root   /var/www;
             index  index.html index.htm;
         }
     }
@@ -81,37 +82,26 @@ http {
 EOF
 
 # Create a simple index.html file
-RUN mkdir -p /nginx-minimal/usr/local/nginx/html && \
+RUN mkdir -p /nginx-minimal/var/www && \
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
-    /nginx-minimal/usr/local/nginx/html/index.html
+    /nginx-minimal/var/www/index.html
 
-# Create a startup wrapper script
-RUN cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
+# Create a startup wrapper script with standard paths
+RUN cat > /nginx-minimal/usr/local/sbin/start-nginx.sh << 'EOF'
 #!/bin/sh
 
 # Ensure log directory exists and has proper permissions
-mkdir -p /logs
-chmod 755 /logs
-touch /logs/access.log /logs/error.log
-chmod 644 /logs/access.log /logs/error.log
-
-# Check if user mounted a custom config
-if [ -f /config/nginx.conf ]; then
-    # Use mounted config
-    cp -f /config/nginx.conf /usr/local/nginx/conf/nginx.conf
-    echo "Using custom Nginx configuration from mounted volume"
-else
-    # Use default config
-    cp -f /config/default.conf /usr/local/nginx/conf/nginx.conf
-    echo "Using default Nginx configuration"
-fi
+mkdir -p /var/log/nginx
+chmod 755 /var/log/nginx
+touch /var/log/nginx/access.log /var/log/nginx/error.log
+chmod 644 /var/log/nginx/access.log /var/log/nginx/error.log
 
 # Start Nginx in foreground
-exec /usr/local/nginx/sbin/nginx -g "daemon off;"
+exec /usr/local/sbin/nginx -g "daemon off;" -c /etc/nginx/nginx.conf
 EOF
 
 # Make the startup script executable
-RUN chmod +x /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh
+RUN chmod +x /nginx-minimal/usr/local/sbin/start-nginx.sh
 
 # Final image
 FROM scratch
@@ -119,11 +109,11 @@ FROM scratch
 # Copy the entire minimal filesystem
 COPY --from=builder /nginx-minimal /
 
-# Define volumes for configuration and logs
-VOLUME ["/config", "/logs"]
+# Define volumes for configuration, logs and web content
+VOLUME ["/etc/nginx", "/var/log/nginx", "/var/www"]
 
 # Expose port
 EXPOSE 80
 
 # Set command
-CMD ["/usr/local/nginx/sbin/start-nginx.sh"]
+CMD ["/usr/local/sbin/start-nginx.sh"]
