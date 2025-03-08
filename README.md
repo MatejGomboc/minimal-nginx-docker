@@ -14,6 +14,7 @@ At 7-15MB in size, this image is perfect for microservice architectures where Ng
 - **Fast startup**: Smaller images pull and deploy faster, ideal for scaling and CI/CD pipelines
 - **Resource efficient**: Low memory usage, perfect for containerized environments
 - **External configuration**: Mount your Nginx config without rebuilding the image
+- **Persistent logging**: Map logs to host for monitoring and troubleshooting
 
 ## Requirements
 
@@ -55,7 +56,21 @@ build-minimal-nginx.bat
 docker run -d -p 80:80 --name nginx-proxy minimal-nginx
 ```
 
-### Using with a backend API service
+### Complete setup with config, logs, and frontend assets
+
+```bash
+# Linux/macOS
+docker run -d -p 80:80 \
+  -v $(pwd)/sample-nginx.conf:/config/nginx.conf \
+  -v $(pwd)/frontend:/usr/local/nginx/html \
+  -v $(pwd)/logs:/logs \
+  --name nginx-proxy minimal-nginx
+
+# Windows (Command Prompt)
+docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf -v %cd%\frontend:/usr/local/nginx/html -v %cd%\logs:/logs --name nginx-proxy minimal-nginx
+```
+
+### Using with a backend API service (Docker Compose)
 
 Using Docker Compose is the recommended approach for connecting to your backend:
 
@@ -71,6 +86,7 @@ services:
     volumes:
       - ./sample-nginx.conf:/config/nginx.conf
       - ./frontend:/usr/local/nginx/html
+      - ./logs:/logs
     depends_on:
       - backend-api
 
@@ -80,34 +96,33 @@ services:
       - "8080"
 ```
 
-### Custom reverse proxy configuration
+## Log Management
 
-The repository includes a sample reverse proxy configuration. To use it:
+All Nginx logs are configured to write to the `/logs` directory, which is defined as a Docker volume. This provides several advantages:
+
+1. **Persistence**: Logs remain accessible after container restart or replacement
+2. **Host access**: Access logs directly from host OS for analysis or monitoring
+3. **Integration**: Easily connect to log aggregation systems like ELK or Fluentd
+
+### Customizing log formats
+
+The sample config includes a comprehensive log format with:
+- Client IP and user agent
+- Request timing and response size
+- Upstream response time
+- Separate logs for API requests
+
+### Viewing logs in real-time
 
 ```bash
-# Linux/macOS
-docker run -d -p 80:80 -v $(pwd)/sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
+# Follow the main access log
+tail -f logs/access.log
 
-# Windows (Command Prompt)
-docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
+# Follow the API-specific log
+tail -f logs/api-access.log
 
-# Windows (PowerShell)
-docker run -d -p 80:80 -v ${PWD}\sample-nginx.conf:/config/nginx.conf --name nginx-proxy minimal-nginx
-```
-
-### Mounting static frontend files
-
-You can also mount your frontend assets:
-
-```bash
-# Linux/macOS
-docker run -d -p 80:80 \
-  -v $(pwd)/sample-nginx.conf:/config/nginx.conf \
-  -v $(pwd)/frontend:/usr/local/nginx/html \
-  --name nginx-proxy minimal-nginx
-
-# Windows (simplified)
-docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf -v %cd%\frontend:/usr/local/nginx/html --name nginx-proxy minimal-nginx
+# Follow error logs
+tail -f logs/error.log
 ```
 
 ## Sample Nginx configuration explained
@@ -119,6 +134,7 @@ The included `sample-nginx.conf` is optimized for the reverse proxy use case:
 - Includes response caching for GET requests
 - Sets security headers
 - Handles SPA routing by redirecting to index.html
+- Enhanced logging with detailed format and API-specific logs
 - Optimized for performance with compression, caching, and buffer settings
 
 ## Customizing the build
