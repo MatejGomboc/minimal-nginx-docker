@@ -39,6 +39,7 @@ docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx && \
     mkdir -p /nginx-minimal/var/log/nginx && \
     mkdir -p /nginx-minimal/var/run && \
     mkdir -p /nginx-minimal/etc && \
+    mkdir -p /nginx-minimal/config && \
     cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && \
     echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd"
 
@@ -56,8 +57,8 @@ docker exec nginx-builder sh -c "if [ -f /lib/ld-musl-*.so.1 ]; then \
     cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/; \
 fi"
 
-# Step 5: Create a basic nginx configuration
-docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/nginx/conf/nginx.conf << 'EOF'
+# Step 5: Move the default nginx configuration to a separate directory
+docker exec nginx-builder sh -c "cat > /nginx-minimal/config/default.conf << 'EOF'
 worker_processes 1;
 events { worker_connections 1024; }
 http {
@@ -81,11 +82,33 @@ docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/usr/local/nginx/html &&
     echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
     /nginx-minimal/usr/local/nginx/html/index.html"
 
+# Create a startup wrapper script that checks for mounted config
+docker exec nginx-builder sh -c "cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
+#!/bin/sh
+# Check if user mounted a custom config
+if [ -f /config/nginx.conf ]; then
+    # Use mounted config
+    cp -f /config/nginx.conf /usr/local/nginx/conf/nginx.conf
+    echo "Using custom Nginx configuration from mounted volume"
+else
+    # Use default config
+    cp -f /config/default.conf /usr/local/nginx/conf/nginx.conf
+    echo "Using default Nginx configuration"
+fi
+
+# Start Nginx in foreground
+exec /usr/local/nginx/sbin/nginx -g "daemon off;"
+EOF"
+
+# Make the startup script executable
+docker exec nginx-builder sh -c "chmod +x /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh"
+
 # Step 6: Import the filesystem directly as a Docker image
 docker exec nginx-builder sh -c "tar -C /nginx-minimal -cf - ." | \
     docker import - \
     --change 'EXPOSE 80' \
-    --change 'CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]' \
+    --change 'VOLUME ["/config"]' \
+    --change 'CMD ["/usr/local/nginx/sbin/start-nginx.sh"]' \
     minimal-nginx
 
 # Step 7: Clean up
@@ -94,3 +117,13 @@ docker rm nginx-builder
 
 # Show the image size
 docker images minimal-nginx
+
+echo ""
+echo "Minimal Nginx Docker image created successfully!"
+echo ""
+echo "To run with default configuration:"
+echo "docker run -d -p 8080:80 --name nginx-server minimal-nginx"
+echo ""
+echo "To run with custom configuration:"
+echo "docker run -d -p 8080:80 -v \$(pwd)/my-nginx.conf:/config/nginx.conf --name nginx-server minimal-nginx"
+echo ""
