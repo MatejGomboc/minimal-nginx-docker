@@ -38,11 +38,14 @@ if %ERRORLEVEL% neq 0 (
 
 REM Step 3: Create a minimal filesystem structure with standard paths
 echo Step 3: Creating minimal filesystem structure...
-docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/etc/nginx && mkdir -p /nginx-minimal/var/log/nginx && mkdir -p /nginx-minimal/var/run && mkdir -p /nginx-minimal/var/www && mkdir -p /nginx-minimal/usr/local/sbin && cp -r /etc/nginx/* /nginx-minimal/etc/nginx/ && cp /usr/local/sbin/nginx /nginx-minimal/usr/local/sbin/ && echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd"
+docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/etc/nginx && mkdir -p /nginx-minimal/var/log/nginx && mkdir -p /nginx-minimal/var/run && mkdir -p /nginx-minimal/var/www && mkdir -p /nginx-minimal/usr/local/sbin && cp -r /etc/nginx/* /nginx-minimal/etc/nginx/ && cp /usr/local/sbin/nginx /nginx-minimal/usr/local/sbin/"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to create filesystem structure
     goto cleanup
 )
+
+REM Create proper passwd and group files with nobody user and group
+docker exec nginx-builder sh -c "mkdir -p /nginx-minimal/etc && echo 'root:x:0:0:root:/root:/bin/sh' > /nginx-minimal/etc/passwd && echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' >> /nginx-minimal/etc/passwd && echo 'root:x:0:' > /nginx-minimal/etc/group && echo 'nobody:x:65534:' >> /nginx-minimal/etc/group"
 
 REM Step 4: Copy necessary libraries - using simpler approach for Windows
 echo Step 4: Copying required shared libraries...
@@ -58,7 +61,8 @@ REM Step 5: Create a basic nginx configuration
 echo Step 5: Creating default configuration...
 
 REM Use echo inside the container to create the config file
-docker exec nginx-builder sh -c "echo 'worker_processes 1;' > /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo 'user nobody;' > /nginx-minimal/etc/nginx/nginx.conf"
+docker exec nginx-builder sh -c "echo 'worker_processes 1;' >> /nginx-minimal/etc/nginx/nginx.conf"
 docker exec nginx-builder sh -c "echo 'events { worker_connections 1024; }' >> /nginx-minimal/etc/nginx/nginx.conf"
 docker exec nginx-builder sh -c "echo 'http {' >> /nginx-minimal/etc/nginx/nginx.conf"
 docker exec nginx-builder sh -c "echo '    include       mime.types;' >> /nginx-minimal/etc/nginx/nginx.conf"
