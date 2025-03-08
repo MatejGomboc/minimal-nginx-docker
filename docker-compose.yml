@@ -17,6 +17,7 @@ services:
     depends_on:
       - backend-api
     restart: unless-stopped
+    # No need for custom command - it will use the CMD from the image
 
   backend-api:
     # This is a placeholder for your actual backend API service
