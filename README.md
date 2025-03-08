@@ -13,6 +13,7 @@ At 7-15MB in size, this image is perfect for microservice architectures where Ng
 - **Minimal attack surface**: Contains only what's needed for proxy/static file serving
 - **Fast startup**: Smaller images pull and deploy faster, ideal for scaling and CI/CD pipelines
 - **Resource efficient**: Low memory usage, perfect for containerized environments
+- **Standard file layout**: Uses conventional Linux file paths for familiarity
 - **External configuration**: Mount your Nginx config without rebuilding the image
 - **Persistent logging**: Map logs to host for monitoring and troubleshooting
 
@@ -61,13 +62,13 @@ docker run -d -p 80:80 --name nginx-proxy minimal-nginx
 ```bash
 # Linux/macOS
 docker run -d -p 80:80 \
-  -v $(pwd)/sample-nginx.conf:/config/nginx.conf \
-  -v $(pwd)/frontend:/usr/local/nginx/html \
-  -v $(pwd)/logs:/logs \
+  -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf \
+  -v $(pwd)/www:/var/www \
+  -v $(pwd)/logs:/var/log/nginx \
   --name nginx-proxy minimal-nginx
 
 # Windows (Command Prompt)
-docker run -d -p 80:80 -v %cd%\sample-nginx.conf:/config/nginx.conf -v %cd%\frontend:/usr/local/nginx/html -v %cd%\logs:/logs --name nginx-proxy minimal-nginx
+docker run -d -p 80:80 -v %cd%\nginx.conf:/etc/nginx/nginx.conf -v %cd%\www:/var/www -v %cd%\logs:/var/log/nginx --name nginx-proxy minimal-nginx
 ```
 
 ### Using with a backend API service (Docker Compose)
@@ -84,9 +85,9 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./sample-nginx.conf:/config/nginx.conf
-      - ./frontend:/usr/local/nginx/html
-      - ./logs:/logs
+      - ./sample-nginx.conf:/etc/nginx/nginx.conf
+      - ./frontend:/var/www
+      - ./logs:/var/log/nginx
     depends_on:
       - backend-api
 
@@ -102,22 +103,25 @@ The minimal-nginx image contains approximately 30 files and 15 directories, tota
 
 ```
 /
-├── config              # Configuration directory (mountable volume)
-│   └── default.conf    # Default Nginx configuration
 ├── etc
-│   └── passwd          # Minimal passwd file for 'nobody' user
-├── lib                 # Only necessary shared libraries
+│   ├── nginx            # Configuration directory (mountable volume)
+│   │   ├── default.conf
+│   │   ├── mime.types
+│   │   └── nginx.conf   # Main Nginx configuration
+│   └── passwd           # Minimal passwd file for 'nobody' user
+├── lib                  # Only necessary shared libraries
 │   ├── ld-musl-x86_64.so.1
 │   ├── libcrypto.so.3
 │   ├── libpcre.so.1
 │   ├── libssl.so.3
 │   └── libz.so.1
-├── logs                # Logs directory (mountable volume)
-├── usr/local/nginx     # Nginx installation
-│   ├── conf            # Nginx configuration files
-│   ├── html            # Default web content (mountable)
-│   └── sbin            # Nginx binary and startup script
-└── var/run             # Runtime files
+├── usr/local/sbin       # Executables
+│   ├── nginx            # Nginx binary
+│   └── start-nginx.sh   # Startup script
+└── var
+    ├── log/nginx        # Logs directory (mountable volume)
+    ├── run              # Runtime files
+    └── www              # Web content (mountable volume)
 ```
 
 To view the exact file structure of your built image, use the included scripts:
@@ -129,7 +133,7 @@ These scripts will show a complete tree view of all files in the image. You can 
 
 ## Log Management
 
-All Nginx logs are configured to write to the `/logs` directory, which is defined as a Docker volume. This provides several advantages:
+All Nginx logs are configured to write to the `/var/log/nginx` directory, which is defined as a Docker volume. This provides several advantages:
 
 1. **Persistence**: Logs remain accessible after container restart or replacement
 2. **Host access**: Access logs directly from host OS for analysis or monitoring
