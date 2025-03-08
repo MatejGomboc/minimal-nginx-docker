@@ -19,8 +19,8 @@ RUN ./configure \
     --sbin-path=/usr/local/nginx/sbin/nginx \
     --conf-path=/usr/local/nginx/conf/nginx.conf \
     --pid-path=/var/run/nginx.pid \
-    --error-log-path=/var/log/nginx/error.log \
-    --http-log-path=/var/log/nginx/access.log \
+    --error-log-path=/logs/error.log \
+    --http-log-path=/logs/access.log \
     --with-pcre \
     --with-http_ssl_module \
     --with-http_v2_module \
@@ -42,7 +42,7 @@ RUN ./configure \
 
 # Prepare minimal filesystem
 RUN mkdir -p /nginx-minimal/usr/local/nginx && \
-    mkdir -p /nginx-minimal/var/log/nginx && \
+    mkdir -p /nginx-minimal/logs && \
     mkdir -p /nginx-minimal/var/run && \
     mkdir -p /nginx-minimal/etc && \
     mkdir -p /nginx-minimal/config && \
@@ -64,6 +64,11 @@ http {
     default_type  application/octet-stream;
     sendfile        on;
     keepalive_timeout  65;
+
+    # Log configuration
+    access_log  /logs/access.log;
+    error_log   /logs/error.log;
+
     server {
         listen       80;
         server_name  localhost;
@@ -83,6 +88,13 @@ RUN mkdir -p /nginx-minimal/usr/local/nginx/html && \
 # Create a startup wrapper script
 RUN cat > /nginx-minimal/usr/local/nginx/sbin/start-nginx.sh << 'EOF'
 #!/bin/sh
+
+# Ensure log directory exists and has proper permissions
+mkdir -p /logs
+chmod 755 /logs
+touch /logs/access.log /logs/error.log
+chmod 644 /logs/access.log /logs/error.log
+
 # Check if user mounted a custom config
 if [ -f /config/nginx.conf ]; then
     # Use mounted config
@@ -107,8 +119,8 @@ FROM scratch
 # Copy the entire minimal filesystem
 COPY --from=builder /nginx-minimal /
 
-# Define a volume for configuration
-VOLUME ["/config"]
+# Define volumes for configuration and logs
+VOLUME ["/config", "/logs"]
 
 # Expose port
 EXPOSE 80
