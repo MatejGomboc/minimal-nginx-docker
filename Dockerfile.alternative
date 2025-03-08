@@ -1,0 +1,92 @@
+# This is an alternative multi-stage build approach
+# It's more Dockerfile-native but results in a slightly larger image than the script method
+
+# Build stage
+FROM alpine:latest AS builder
+
+# Install build dependencies
+RUN apk add --no-cache gcc libc-dev make openssl-dev pcre-dev zlib-dev linux-headers wget
+
+# Download and extract Nginx
+WORKDIR /tmp
+RUN wget https://nginx.org/download/nginx-1.24.0.tar.gz && \
+    tar -zxf nginx-1.24.0.tar.gz
+
+# Configure and build Nginx with minimal modules
+WORKDIR /tmp/nginx-1.24.0
+RUN ./configure \
+    --prefix=/usr/local/nginx \
+    --sbin-path=/usr/local/nginx/sbin/nginx \
+    --conf-path=/usr/local/nginx/conf/nginx.conf \
+    --pid-path=/var/run/nginx.pid \
+    --error-log-path=/var/log/nginx/error.log \
+    --http-log-path=/var/log/nginx/access.log \
+    --with-pcre \
+    --with-http_ssl_module \
+    --with-http_v2_module \
+    --without-http_scgi_module \
+    --without-http_uwsgi_module \
+    --without-http_fastcgi_module \
+    --without-http_geo_module \
+    --without-http_map_module \
+    --without-http_split_clients_module \
+    --without-http_referer_module \
+    --without-http_rewrite_module \
+    --without-http_proxy_module \
+    --without-http_memcached_module \
+    --without-mail_pop3_module \
+    --without-mail_imap_module \
+    --without-mail_smtp_module && \
+    make && \
+    make install
+
+# Prepare minimal filesystem
+RUN mkdir -p /nginx-minimal/usr/local/nginx && \
+    mkdir -p /nginx-minimal/var/log/nginx && \
+    mkdir -p /nginx-minimal/var/run && \
+    mkdir -p /nginx-minimal/etc && \
+    cp -r /usr/local/nginx/* /nginx-minimal/usr/local/nginx/ && \
+    echo 'nobody:x:65534:65534:nobody:/:/sbin/nologin' > /nginx-minimal/etc/passwd
+
+# Find and copy required libraries
+RUN mkdir -p /nginx-minimal/lib && \
+    ldd /usr/local/nginx/sbin/nginx | grep "=> /" | awk '{print $3}' | \
+    xargs -I '{}' cp -v '{}' /nginx-minimal/lib/ && \
+    cp -v /lib/ld-musl-*.so.1 /nginx-minimal/lib/ 2>/dev/null || true
+
+# Create a basic nginx configuration
+RUN cat > /nginx-minimal/usr/local/nginx/conf/nginx.conf << 'EOF'
+worker_processes 1;
+events { worker_connections 1024; }
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+    server {
+        listen       80;
+        server_name  localhost;
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+}
+EOF
+
+# Create a simple index.html file
+RUN mkdir -p /nginx-minimal/usr/local/nginx/html && \
+    echo '<html><body><h1>Hello from minimal Nginx!</h1></body></html>' > \
+    /nginx-minimal/usr/local/nginx/html/index.html
+
+# Final image
+FROM scratch
+
+# Copy the entire minimal filesystem
+COPY --from=builder /nginx-minimal /
+
+# Expose port
+EXPOSE 80
+
+# Set command
+CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
