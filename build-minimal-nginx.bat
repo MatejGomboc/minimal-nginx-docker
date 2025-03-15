@@ -22,7 +22,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Download and extract Nginx source
 echo Downloading and extracting Nginx...
-docker exec nginx-builder sh -c "cd /tmp && wget https://nginx.org/download/nginx-1.24.0.tar.gz && tar -zxf nginx-1.24.0.tar.gz"
+docker exec nginx-builder sh -c "cd /tmp && wget https://nginx.org/download/nginx-1.26.3.tar.gz && tar -zxf nginx-1.26.3.tar.gz"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to download or extract Nginx
     goto cleanup
@@ -30,7 +30,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM Configure and build Nginx with minimal modules using standard paths
 echo Building Nginx from source (this may take a few minutes)...
-docker exec nginx-builder sh -c "cd /tmp/nginx-1.24.0 && ./configure --prefix=/var/www --sbin-path=/usr/local/sbin/nginx --conf-path=/etc/nginx/nginx.conf --pid-path=/var/run/nginx.pid --error-log-path=/var/log/nginx/error.log --http-log-path=/var/log/nginx/access.log --with-pcre --with-http_ssl_module --with-http_v2_module --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_geo_module --without-http_map_module --without-http_split_clients_module --without-http_referer_module --without-http_rewrite_module --without-http_proxy_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
+docker exec nginx-builder sh -c "cd /tmp/nginx-1.26.3 && ./configure --prefix=/var/www --sbin-path=/usr/local/sbin/nginx --conf-path=/etc/nginx/nginx.conf --error-log-path=/var/log/nginx/error.log --pid-path=/var/run/nginx.pid --http-log-path=/var/log/nginx/access.log --with-pcre --with-pcre-jit --with-http_ssl_module --with-http_v2_module --with-http_v3_module --with-http_realip_module --with-http_gzip_static_module --with-http_gunzip_module --with-http_stub_status_module --with-http_auth_request_module --with-http_sub_module --with-http_addition_module --with-http_secure_link_module --with-http_slice_module --with-http_degradation_module --with-threads --with-file-aio  --without-http_scgi_module --without-http_uwsgi_module --without-http_fastcgi_module --without-http_memcached_module --without-mail_pop3_module --without-mail_imap_module --without-mail_smtp_module && make && make install"
 if %ERRORLEVEL% neq 0 (
     echo Error: Failed to build Nginx
     goto cleanup
